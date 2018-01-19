@@ -64,3 +64,11 @@ RSpec.configuration do |config|
 end
 ```
 
+## Generate Models
+
+1. Create ToDo model: `$ rails g model Todo title created_by`
+
+2. Create the Item model: `$ rails g model Item name done:boolean todo:references`
+
+3. Run the migrations: `$ rails db:migrate`
+
