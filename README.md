@@ -1,24 +1,5 @@
-# README
+# Rails ToDo API w/ RSpec
 
-This README would normally document whatever steps are necessary to get the
-application up and running.
+A simple ToDo API built following [this tutorial](https://scotch.io/tutorials/build-a-restful-json-api-with-rails-5-part-one).
 
-Things you may want to cover:
-
-* Ruby version
-
-* System dependencies
-
-* Configuration
-
-* Database creation
-
-* Database initialization
-
-* How to run the test suite
-
-* Services (job queues, cache servers, search engines, etc.)
-
-* Deployment instructions
-
-* ...
+Uses RSpec, FactoryGirl, DatabaseCleaner, and Faker for TDD and BDD.
