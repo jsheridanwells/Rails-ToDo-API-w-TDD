@@ -72,3 +72,61 @@ end
 
 3. Run the migrations: `$ rails db:migrate`
 
+## Model Specs
+
+1. In todo_spec.rb:
+```
+require 'rails_helper'
+
+# Test suite for the Todo model
+RSpec.describe Todo, type: :model do
+  # Association test
+  # ensure Todo model has a 1:m relationship with the Item model
+  it { should have_many(:items).dependent(:destroy) }
+  # Validation tests
+  # ensure columns title and created_by are present before saving
+  it { should validate_presence_of(:title) }
+  it { should validate_presence_of(:created_by) }
+end
+```
+
+2. In item_spec.rb:
+```
+require 'rails_helper'
+
+# Test suite for the Item model
+RSpec.describe Item, type: :model do
+  # Association test
+  # ensure an item record belongs to a single todo record
+  it { should belong_to(:todo) }
+  # Validation test
+  # ensure column name is present before saving
+  it { should validate_presence_of(:name) }
+end
+```
+
+3. Tests should fail.
+
+4. Fix Todo model:
+```
+class Todo < ApplicationRecord
+  # model association
+  has_many :items, dependent: :destroy
+
+  # validations
+  validates_presence_of :title, :created_by
+end
+```
+
+5. Fix Item model:
+```
+class Item < ApplicationRecord
+  # model association
+  belongs_to :todo
+
+  # validation
+  validates_presence_of :name
+end
+```
+
+6. All tests should pass
