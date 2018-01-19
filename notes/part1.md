@@ -141,7 +141,7 @@ $ rails g controller Items
 
 2. Since this is an API, we'll use REQUEST specs instead of CONTROLLER specs. Request specs hit endpoints like a client would while controller specs only test controller actions. Create requests directory and specs:
 ```
-$ mkdir spec/requests/{todos_spec.rb,items_spec.rb}
+$ mkdir spec/requests/ && spec/requests/{todos_spec.rb,items_spec.rb}
 ```
 
 3. Create factory files:
@@ -171,7 +171,14 @@ end
 
 ## Set up API tests
 
-1. `# spec/requests/todos_spec.rb`
+0. Helpful to scaffold out all tests based on endpoints you know you'll have, example:
+```
+  describe 'GET /todos' do
+
+  end
+```
+
+1. Full API test suite: `# spec/requests/todos_spec.rb`
 ```
 require 'rails_helper'
 
@@ -307,3 +314,104 @@ config.include RequestSpecHelper
 (See [this example for rails_helper.rb config](https://github.com/akabiru/todos-api/blob/master/spec/rails_helper.rb))
 
 5. Tests should fail (routes are not yet defined).
+
+## Create the routes
+
+1. Create the routes, the nested items routes enforces 1:m relationship (See [this explanation](http://guides.rubyonrails.org/routing.html#nested-resources))
+```
+# config/routes.rb
+Rails.application.routes.draw do
+  resources :todos do
+    resources :items
+  end
+end
+
+```
+2. Run tests, and failures come from uninitialized controllers
+
+## Create the controllers
+
+1. First, create helper methods json_responses for organizing data in controller, and exception handler to rescue errors
+```
+$ touch app/controllers/concerns/{response.rb,exception_handler.rb}
+```
+
+2. In `response.rb`:
+```
+module Response
+  def json_response(object, status = :ok)
+    render json: object, status: status
+  end
+end
+```
+
+3. In `exception_handerl.rb`
+```
+module ExceptionHandler
+  # provides the more graceful `included` method
+  extend ActiveSupport::Concern
+
+  included do
+    rescue_from ActiveRecord::RecordNotFound do |e|
+      json_response({ message: e.message }, :not_found)
+    end
+
+    rescue_from ActiveRecord::RecordInvalid do |e|
+      json_response({ message: e.message }, :unprocessable_entity)
+    end
+  end
+end
+```
+
+4. Create Todos Controller (note, I'm using `touch` instead of Rails generator because spec is not necessary ):
+```
+$ touch app/controllers/todos_controller.rb
+```
+
+5. Add the following actions to `todos_controller.rb`:
+```
+class TodosController < ApplicationController
+  before_action :set_todo, only: [:show, :update, :destroy]
+
+  # GET /todos
+  def index
+    @todos = Todo.all
+    json_response(@todos)
+  end
+
+  # POST /todos
+  def create
+    @todo = Todo.create!(todo_params)
+    json_response(@todo, :created)
+  end
+
+  # GET /todos/:id
+  def show
+    json_response(@todo)
+  end
+
+  # PUT /todos/:id
+  def update
+    @todo.update(todo_params)
+    head :no_content
+  end
+
+  # DELETE /todos/:id
+  def destroy
+    @todo.destroy
+    head :no_content
+  end
+
+  private
+
+  def todo_params
+    # whitelist params
+    params.permit(:title, :created_by)
+  end
+
+  def set_todo
+    @todo = Todo.find(params[:id])
+  end
+end
+```
+
