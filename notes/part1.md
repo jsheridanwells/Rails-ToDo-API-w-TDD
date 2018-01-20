@@ -1,4 +1,4 @@
-# Build a RESTful JSON API w/ Rails and RSpec
+# Build a RESTful JSON API w/ Rails and RSpec PART ONE
 From [this tutorial](https://scotch.io/tutorials/build-a-restful-json-api-with-rails-5-part-one).
 
 ## Dependency Setup
