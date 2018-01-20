@@ -483,3 +483,97 @@ RSpec.describe 'Authentication', type: :request do
 end
 ```
 
+3. Add the '/auth/login' endpoint in `routes.rb`:
+```
+post 'auth/login', to: 'authentication#authenticate'
+```
+
+## Users controller
+
+1. Create Users controller and specs:
+```
+$ touch app/controllers/users_controller.rb
+$ touch spec/requests/users_spec.rb
+```
+
+2. Create the user signup spec:
+```
+# spec/requests/users_spec.rb
+require 'rails_helper'
+
+RSpec.describe 'Users API', type: :request do
+  let(:user) { build(:user) }  # (build is used because it is not necessary for this instance to persist to the db)
+  let(:headers) { valid_headers.except('Authorization') }
+  let(:valid_attributes) do
+    attributes_for(:user, password_confirmation: user.password)
+  end
+
+  # User signup test suite
+  describe 'POST /signup' do
+    context 'when valid request' do
+      before { post '/signup', params: valid_attributes.to_json, headers: headers }
+
+      it 'creates a new user' do
+        expect(response).to have_http_status(201)
+      end
+
+      it 'returns success message' do
+        expect(json['message']).to match(/Account created successfully/)
+      end
+
+      it 'returns an authentication token' do
+        expect(json['auth_token']).not_to be_nil
+      end
+    end
+
+    context 'when invalid request' do
+      before { post '/signup', params: {}, headers: headers }
+
+      it 'does not create a new user' do
+        expect(response).to have_http_status(422)
+      end
+
+      it 'returns failure message' do
+        expect(json['message'])
+          .to match(/Validation failed: Password can't be blank, Name can't be blank, Email can't be blank, Password digest can't be blank/)
+      end
+    end
+  end
+end
+```
+
+2. Draw the /signup route in `routes.rb`:
+```
+post 'signup', to: 'users#create'
+```
+
+3. Create the Users controller:
+```
+# app/controllers/users_controller.rb
+class UsersController < ApplicationController
+  # POST /signup
+  # return authenticated token upon signup
+  def create
+    user = User.create!(user_params)
+    auth_token = AuthenticateUser.new(user.email, user.password).call
+    response = { message: Message.account_created, auth_token: auth_token }
+    json_response(response, :created)
+  end
+
+  private
+
+  def user_params
+    params.permit(
+      :name,
+      :email,
+      :password,
+      :password_confirmation
+    )
+  end
+end
+```
+
+4.  All tests should pass
+
+## Requiring authorization at all endpoints
+
