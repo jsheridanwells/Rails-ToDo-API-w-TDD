@@ -1,3 +1,5 @@
+require 'rails_helper'
+
 RSpec.describe AuthenticationController do
   describe 'POST /auth/login' do
     let!(:user) { create(:user) }

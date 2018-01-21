@@ -577,3 +577,231 @@ end
 
 ## Requiring authorization at all endpoints
 
+1. Create an application controller spec: `$ touch spec/controllers/application_controller_spec.rb`
+
+2. Create the following specs:
+```
+# spec/controllers/application_controller_spec.rb
+require "rails_helper"
+
+RSpec.describe ApplicationController, type: :controller do
+  # create test user
+  let!(:user) { create(:user) }
+   # set headers for authorization
+  let(:headers) { { 'Authorization' => token_generator(user.id) } }
+  let(:invalid_headers) { { 'Authorization' => nil } }
+
+  describe "#authorize_request" do
+    context "when auth token is passed" do
+      before { allow(request).to receive(:headers).and_return(headers) }
+
+      # private method authorize_request returns current user
+      it "sets the current user" do
+        expect(subject.instance_eval { authorize_request }).to eq(user)
+      end
+    end
+
+    context "when auth token is not passed" do
+      before do
+        allow(request).to receive(:headers).and_return(invalid_headers)
+      end
+
+      it "raises MissingToken error" do
+        expect { subject.instance_eval { authorize_request } }.
+          to raise_error(ExceptionHandler::MissingToken, /Missing token/)
+      end
+    end
+  end
+end
+```
+
+3. Add authorize_request action in application controller, allow it to set @current_user, set before_action for all controllers (skipped when creating user):
+```
+# app/controllers/application_controller.rb
+class ApplicationController < ActionController::API
+  include Response
+  include ExceptionHandler
+
+  # called before every action on controllers
+  before_action :authorize_request
+  attr_reader :current_user
+
+  private
+
+  # Check for valid request token and return user
+  def authorize_request
+    @current_user = (AuthorizeApiRequest.new(request.headers).call)[:user]
+  end
+end
+```
+
+4. Skip :authorize_request before authenticate and users#create:
+```
+# app/controllers/authentication_controller.rb
+class AuthenticationController < ApplicationController
+  skip_before_action :authorize_request, only: :authenticate
+  # [...]
+end
+
+# app/controllers/users_controller.rb
+class UsersController < ApplicationController
+  skip_before_action :authorize_request, only: :create
+  # [...]
+end
+```
+
+__Todo and TodoItems test will now fail because the tests do not have authorization headers__
+
+## Updating Todo and Items Specs
+
+1. update `todos_spec.rb` to have authorization headers on all tests:
+```
+# spec/requests/todos_spec.rb
+require 'rails_helper'
+
+RSpec.describe 'Todos API', type: :request do
+  # add todos owner
+  let(:user) { create(:user) }
+  let!(:todos) { create_list(:todo, 10, created_by: user.id) }
+  let(:todo_id) { todos.first.id }
+  # authorize request
+  let(:headers) { valid_headers }
+
+  describe 'GET /todos' do
+    # update request with headers
+    before { get '/todos', params: {}, headers: headers }
+
+    # [...]
+  end
+
+  describe 'GET /todos/:id' do
+    before { get "/todos/#{todo_id}", params: {}, headers: headers }
+    # [...]
+    end
+    # [...]
+  end
+
+  describe 'POST /todos' do
+    let(:valid_attributes) do
+      # send json payload
+      { title: 'Learn Elm', created_by: user.id.to_s }.to_json
+    end
+
+    context 'when request is valid' do
+      before { post '/todos', params: valid_attributes, headers: headers }
+      # [...]
+    end
+
+    context 'when request is invalid' do
+      let(:valid_attributes) { { title: nil }.to_json }
+      before { post '/todos', params: valid_attributes, headers: headers }
+      # [...]
+    end
+  end
+
+  describe 'PUT /todos/:id' do
+    let(:valid_attributes) { { title: 'Shopping' }.to_json }
+
+    context 'when the record exists' do
+      before { put "/todos/#{todo_id}", params: valid_attributes, headers: headers }
+      # [...]
+    end
+  end
+
+  describe 'DELETE /todos/:id' do
+    before { delete "/todos/#{todo_id}", params: {}, headers: headers }
+    # [...]
+  end
+end
+```
+
+2. update `todos_controller.rb` so it knows about users: 
+```
+# app/controllers/todos_controller.rb
+class TodosController < ApplicationController
+  # [...]
+  # GET /todos
+  def index
+    # get current user todos
+    @todos = current_user.todos
+    json_response(@todos)
+  end
+  # [...]
+  # POST /todos
+  def create
+    # create todos belonging to current user
+    @todo = current_user.todos.create!(todo_params)
+    json_response(@todo, :created)
+  end
+  # [...]
+  private
+
+  # remove `created_by` from list of permitted parameters
+  def todo_params
+    params.permit(:title)
+  end
+  # [...]
+end
+```
+
+3. update items API, updated `items_spec.rb`:
+```
+# spec/requests/items_spec.rb
+require 'rails_helper'
+
+RSpec.describe 'Items API' do
+  let(:user) { create(:user) }
+  let!(:todo) { create(:todo, created_by: user.id) }
+  let!(:items) { create_list(:item, 20, todo_id: todo.id) }
+  let(:todo_id) { todo.id }
+  let(:id) { items.first.id }
+  let(:headers) { valid_headers }
+
+  describe 'GET /todos/:todo_id/items' do
+    before { get "/todos/#{todo_id}/items", params: {}, headers: headers }
+
+    # [...]
+  end
+
+  describe 'GET /todos/:todo_id/items/:id' do
+    before { get "/todos/#{todo_id}/items/#{id}", params: {}, headers: headers }
+
+    # [...]
+  end
+
+  describe 'POST /todos/:todo_id/items' do
+    let(:valid_attributes) { { name: 'Visit Narnia', done: false }.to_json }
+
+    context 'when request attributes are valid' do
+      before do
+        post "/todos/#{todo_id}/items", params: valid_attributes, headers: headers
+      end
+
+      # [...]
+    end
+
+    context 'when an invalid request' do
+      before { post "/todos/#{todo_id}/items", params: {}, headers: headers }
+
+      # [...]
+    end
+  end
+
+  describe 'PUT /todos/:todo_id/items/:id' do
+    let(:valid_attributes) { { name: 'Mozart' }.to_json }
+
+    before do
+      put "/todos/#{todo_id}/items/#{id}", params: valid_attributes, headers: headers
+    end
+
+    # [...]
+    # [...]
+  end
+
+  describe 'DELETE /todos/:id' do
+    before { delete "/todos/#{todo_id}/items/#{id}", params: {}, headers: headers }
+
+    # [...]
+  end
+end
+```

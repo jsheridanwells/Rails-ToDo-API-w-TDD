@@ -3,11 +3,14 @@ require 'rails_helper'
 RSpec.describe 'Todos API', type: :request do
   # let! is created no matter what, let is created when referenced
   # let! and let create data once, then data is available throughout tests
-  let!(:todos) { create_list(:todo, 10) }  # create_list is a FactoryGirl method, it creates todo 10 times
+
+  let(:user) { create(:user) }
+  let!(:todos) { create_list(:todo, 10, created_by: user.id) }  # create_list is a FactoryGirl method, it creates todo 10 times
   let(:todo_id) { todos.first.id }
+  let(:headers) { valid_headers }
 
   describe 'GET /todos' do
-    before { get '/todos' }
+    before { get '/todos', params: {}, headers: headers }
     it 'returns todos' do
       expect(json).not_to be_empty  #  #json will be helper method to parse JSON responses
       expect(json.size).to eq(10)
@@ -19,7 +22,7 @@ RSpec.describe 'Todos API', type: :request do
   end
 
   describe 'GET /todos/:id' do
-    before { get "/todos/#{todo_id}" }
+    before { get "/todos/#{todo_id}", params: {}, headers: headers }
     context 'when the record exists' do
       it 'returns the todo' do
         expect(json).not_to be_empty
@@ -41,9 +44,11 @@ RSpec.describe 'Todos API', type: :request do
   end
 
   describe 'POST /todos' do
-    let(:valid_attributes) { { title: 'Wash the car', created_by: '1' } }
+    let(:valid_attributes) do 
+      { title: 'Wash the car', created_by: user.id.to_s }.to_json
+    end
     context 'when the request is valid' do
-      before { post '/todos', params: valid_attributes }
+      before { post '/todos', params: valid_attributes, params: valid_attributes, headers: headers }
       it 'creates a todo' do
         expect(json['title']).to eq('Wash the car')
       end
@@ -53,20 +58,21 @@ RSpec.describe 'Todos API', type: :request do
       end
     end
     context 'when request is not valid' do
-      before { post '/todos', params: {title: 'bad post'} }
+      let(:valid_attributes) { { title: nil }.to_json }
+      before { post '/todos', params: valid_attributes, headers: headers }
       it 'returns a status code 422' do
         expect(response).to have_http_status(422)
       end
       it 'returns a validation failure message' do
-        expect(response.body).to match(/Validation failed: Created by can't be blank/)
+        expect(response.body).to match(/Validation failed: Title can't be blank/)
       end
     end
   end
 
   describe 'PUT /todos/:id' do
-    let(:valid_attributes) { { title: 'Shop' } }
+    let(:valid_attributes) { { title: 'Shop' }.to_json }
     context 'when the record exists' do
-      before { put "/todos/#{todo_id}", params: valid_attributes }
+      before { put "/todos/#{todo_id}", params: valid_attributes, headers: headers }
       it 'updates the record' do
         expect(json['title']).to eq('Shop')
       end
@@ -77,7 +83,7 @@ RSpec.describe 'Todos API', type: :request do
   end
 
   describe 'DELETE /todos/:id' do
-    before { delete "/todos/#{todo_id}" }
+    before { delete "/todos/#{todo_id}", params: {}, headers: headers }
     it 'returns the status code 204' do
       expect(response).to have_http_status(204)
     end
