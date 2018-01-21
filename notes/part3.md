@@ -1,4 +1,4 @@
-# Build a RESTful JSON API w/ Rails and RSpec PART TWO
+# Build a RESTful JSON API w/ Rails and RSpec PART THREE
 From [this tutorial](https://scotch.io/tutorials/build-a-restful-json-api-with-rails-5-part-one).
 
 __Part three will cover serialization, versioning, and pagination__
