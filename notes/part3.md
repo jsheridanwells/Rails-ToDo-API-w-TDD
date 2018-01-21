@@ -93,3 +93,72 @@ end
 
 __Tests should pass and todos and items endpoints should respons when `Accept:'application/vnd.todos.v1+json'` is added to the request header.__
 
+## Serializers
+
+1. Add `active_model_serializers` to Gemfile:
+```
+# Gemfile
+# [...]
+  gem 'active_model_serializers', '~> 0.10.0'
+# [...]
+```
+
+2. Bundle install
+
+3. Generate a serializer: `$ rails g serializer todo`
+
+4. Define the todo serializer:
+```
+# app/serializers/todo_serializer.rb
+class TodoSerializer < ActiveModel::Serializer
+  # attributes to be serialized  
+  attributes :id, :title, :created_by, :created_at, :updated_at
+  # model association
+  has_many :items
+end
+```
+
+__Tests should pass and GET /todos/:id should return array of related items__
+
+## Pagination
+
+1. Add the will_paginate gem:
+```
+# Gemfile
+# [...]
+  gem 'will_paginate', '~> 3.1.0'
+# [...]
+```
+
+2. Bundle install
+
+3. Modify todos#index to paginate responses:
+```
+# app/controllers/v1/todos_controller.rb
+module V1
+  class TodosController < ApplicationController
+  # [...]
+  # GET /todos
+  def index
+    # get paginated current user todos
+    @todos = current_user.todos.paginate(page: params[:page], per_page: 20)
+    json_response(@todos)
+  end
+  # [...]
+end
+```
+
+4. Hitting GET /todos?page=1 should get first 20 results 
+
+5. Optional: Create seed data to demo multiple result pages
+a. Install Faker: `gem 'faker'` (or move out of :test group)
+b. Create seed loop:
+```
+# db/seeds.rb
+# seed 50 records
+50.times do
+  todo = Todo.create(title: Faker::Lorem.word, created_by: User.first.id)
+  todo.items.create(name: Faker::Lorem.word, done: false)
+end
+```
+
