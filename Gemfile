@@ -30,3 +30,5 @@ end
 gem 'tzinfo-data', platforms: [:mingw, :mswin, :x64_mingw, :jruby]
 
 # Project-specific gems:
+gem 'bcrypt'
+gem 'jwt'
